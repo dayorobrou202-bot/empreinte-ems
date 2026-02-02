@@ -1,0 +1,105 @@
+/* ManageX custom CSS for pixel-perfect dashboard */
+:root{
+  --mx-dark:#0b1220; /* deep card */
+  --mx-darker:#0f1724; /* very dark */
+  --mx-sidebar:#1e293b; /* sidebar */
+  --mx-primary:#0f72ff;
+  --mx-muted:#9ca3af;
+}
+
+/* Managex font strong italic for titles/menus */
+.managex-font{font-family:'CahierFont', 'Inter', system-ui, sans-serif; font-weight:800; font-style:italic;}
+
+/* Soft variant for other text */
+.managex-soft{font-family:'Inter', system-ui, sans-serif; font-weight:600;}
+
+/* Rounded 2rem helper */
+.rounded-2rem{border-radius:1.25rem;}
+
+/* Stat cards */
+.stat-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02)); border:1px solid rgba(255,255,255,0.03);}
+
+/* Dark themed stat box */
+.stat-card-dark{background:var(--mx-darker); border:1px solid rgba(255,255,255,0.04); box-shadow:inset 0 1px 0 rgba(255,255,255,0.02), 0 6px 18px rgba(2,6,23,0.35);}
+
+/* Top widgets small square */
+.top-widget{width:88px;height:88px;display:flex;align-items:center;justify-content:center;border-radius:12px;box-shadow:0 6px 14px rgba(2,6,23,0.28);}
+.top-widget .icon{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);}
+
+/* Performance section */
+.perf-section{background:linear-gradient(180deg, var(--mx-darker), rgba(9,12,18,0.95)); border-radius:1.25rem; padding:2.5rem; box-shadow:0 12px 30px rgba(2,6,23,0.45);}
+.perf-section .title{margin-bottom:0.5rem}
+.perf-section .subtitle{margin-bottom:1.25rem}
+.perf-card{background:var(--mx-dark); border-radius:1rem; padding:1.75rem; box-shadow:0 8px 20px rgba(2,6,23,0.45); border:1px solid rgba(255,255,255,0.03); min-width:360px; max-width:520px}
+
+.perf-card .avatar{width:64px;height:64px;border-radius:14px;background:#ffffff;color:var(--mx-darker);display:flex;align-items:center;justify-content:center;font-weight:800}
+.perf-card .name{font-weight:800;color:#ffffff; font-size:1rem}
+.perf-card .role{font-size:0.75rem;color:rgba(255,255,255,0.6)}
+.perf-card .score{font-size:1.5rem;font-weight:900;color:#ffffff}
+
+/* Progress bar */
+.progress{height:10px;border-radius:999px;background:rgba(255,255,255,0.04);overflow:hidden;}
+.progress > i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1,#0f72ff,#10b981);}
+
+/* Header fixes to avoid overlap */
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:0 1rem;height:64px;border-bottom:1px solid rgba(15,23,42,0.05);background:white}
+.app-header .search{width:420px;max-width:40vw}
+.app-header .user-area{display:flex;align-items:center;gap:12px}
+.app-header .user-name{font-weight:800;font-style:italic;color:#0f1724}
+.app-header .role-badge{display:inline-block;padding:6px 12px;border-radius:8px;font-weight:700;vertical-align:middle}
+
+/* Global role badge to style badges used outside header */
+.role-badge{display:inline-block;padding:6px 12px;border-radius:8px;font-weight:700;vertical-align:middle}
+
+/* Sidebar enhancements (compact spacing) */
+.sidebar{background:var(--mx-sidebar);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);overflow-y:auto}
+.sidebar .nav-link{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;color:rgba(255,255,255,0.95);margin-bottom:6px}
+.sidebar .nav-link .icon{width:20px;display:inline-flex;justify-content:center}
+.sidebar .nav-link.active{background:linear-gradient(90deg, rgba(15,114,255,0.12), rgba(15,114,255,0.06));box-shadow:0 6px 18px rgba(15,114,255,0.12)}
+
+/* Extra compact rules for hamburger (mobile) to ensure visibility */
+@media (max-width: 1024px){
+  .sidebar .nav-link{padding:6px 6px;gap:8px}
+  .sidebar .nav-link span{font-size:0.94rem}
+  .sidebar{width:14rem}
+}
+
+/* Mobile safe */
+@media (max-width: 800px){
+  .app-header .search{width:160px}
+  .top-widget{width:72px;height:72px}
+}
+
+/* Rounded menu labels (hamburger) */
+aside nav a span{
+  display:inline-block;
+  padding:0.35rem 0.9rem;
+  border-radius:0.75rem;
+  transition:background .18s ease, transform .12s ease;
+}
+aside nav a:hover span{
+  background:rgba(255,255,255,0.04);
+  transform:translateY(-1px);
+}
+
+/* Slightly bolder rounded typography globally for nicer look */
+.managex-font, body, .role-badge, .stat-card, .perf-card, .rounded-text{
+  font-family: 'Nunito', 'CahierFont', Inter, system-ui, sans-serif;
+}
+
+/* Limit hamburger menu label length (single-line ellipsis) */
+aside nav a span{
+  display:inline-block;
+  vertical-align:middle;
+  font-size:0.95rem;
+  line-height:1.2;
+  max-width:9rem; /* visible length on small screens */
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  padding:0.25rem 0.6rem;
+}
+
+@media (min-width: 1024px){
+  aside nav a span{ max-width:12rem; }
+}

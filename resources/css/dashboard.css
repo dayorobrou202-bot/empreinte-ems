@@ -1,0 +1,146 @@
+/* Dashboard shared styles — uniformise les tableaux de bord */
+:root{
+  --primary: #2563eb; /* bleu principal */
+  --primary-600: #1e40af;
+  --sidebar-bg: #1e293b; /* couleur menu hamburger / sidebar */
+  --muted: #6b7280;
+  --card-bg: #ffffff;
+  --glass: rgba(255,255,255,0.6);
+  --accent: #7c3aed; /* violet */
+  --success: #10b981;
+  --danger: #ef4444;
+}
+
+/* Corps et conteneur principal */
+body{
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #0f172a;
+}
+
+main { --content-width: 1200px; }
+
+/* Cartes uniformes : cibler principalement les cartes dans le main pour éviter effets globaux */
+main .bg-white, main .card-base {
+  background-color: var(--card-bg) !important;
+  border-radius: 1.25rem !important; /* rounded-2xl */
+  box-shadow: 0 10px 30px rgba(2,6,23,0.06) !important;
+  border: 1px solid rgba(2,6,23,0.04) !important;
+}
+
+/* Dashboard wrapper: utiliser la même couleur que la sidebar (menu hamburger) */
+.managex-dashboard{
+  background-color: var(--sidebar-bg);
+  color: #ffffff;
+  padding-top: 2.5rem;
+  padding-bottom: 2.5rem;
+  min-height: calc(100vh - 4rem);
+}
+
+/* Titres sur fond sombre */
+.managex-dashboard .managex-font.title{ color: #ffffff; }
+.managex-dashboard .subtitle{ color: rgba(255,255,255,0.75); }
+
+/* Assurer que les cartes conservent un fond blanc lisible sur le fond sombre */
+.managex-dashboard .bg-white, .managex-dashboard main .bg-white { background-color: var(--card-bg) !important; color: #0f172a !important; }
+.managex-dashboard a{ color: inherit; }
+
+/* Boutons principaux et accents */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  padding: .5rem .9rem;
+  border-radius: .75rem;
+  font-weight: 700;
+}
+.btn-primary:hover{ background-color: var(--primary-600); }
+
+/* Titres et sous-titres des dashboards */
+.managex-font.title, .managex-title {
+  color: var(--primary-600);
+  font-size: 1.9rem;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  -webkit-font-smoothing:antialiased;
+}
+
+.managex-subtitle, .subtitle {
+  color: var(--muted);
+  margin-top: .25rem;
+}
+
+/* Cartes de KPI (petites cartes en haut) */
+.dashboard-kpi {
+  padding: 1.2rem;
+  border-radius: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.dashboard-kpi .icon {
+  width: 56px; height:56px; border-radius: 1rem; display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;
+}
+
+/* Performance list */
+.perf-card{
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  color: #0f172a; /* texte sombre pour lisibilité */
+}
+.perf-card .avatar{ width:48px;height:48px;border-radius:10px;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:800 }
+.perf-card .name{ font-weight:700;color:var(--card-title,#0f172a) }
+.perf-card .role{ color: var(--muted); font-size: 12px }
+.perf-card .score{ font-size:1.4rem; font-weight:900; color: var(--primary-600) }
+
+/* Barre de progression custom */
+.progress{ width:100%; background:rgba(15,23,42,0.06); height:12px; border-radius:999px; overflow:hidden }
+.progress i{ display:block; height:100%; background: linear-gradient(90deg,var(--accent),var(--primary)); border-radius:999px }
+
+/* Avatar global */
+.avatar{ width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,var(--primary),var(--primary-600));color:white;display:flex;align-items:center;justify-content:center;font-weight:800 }
+
+/* Badges */
+.role-badge{ padding:.2rem .45rem; border-radius:.5rem; font-weight:700; font-size:0.65rem }
+
+/* Utilities pour contraste (dark-like panels used in admin) */
+.bg-managex-dark{
+  background: linear-gradient(180deg,#0b1220,#0b1220);
+  color: #e6eefc;
+}
+
+/* Table improvements */
+main table th{ background: transparent; color: #6b7280; font-weight:700; }
+main table td{ color: #0f172a }
+
+/* Responsive tweaks */
+@media (max-width: 768px){
+  .managex-font.title{ font-size:1.4rem }
+}
+
+/* Small helpers */
+.text-muted{ color: var(--muted) }
+
+/* Ensure links in cards look consistent */
+main a{ color: inherit; }
+
+/* Final polish: limit overly bright white inside side content */
+main .max-w-6xl, main .max-w-7xl, main .max-w-screen-2xl{ padding: 0 }
+
+/* end */
+
+/* Fix inputs/textarea/select color contrast inside the dashboard */
+.managex-dashboard input,
+.managex-dashboard textarea,
+.managex-dashboard select,
+.managex-dashboard .input-charte {
+  color: #0f172a !important;
+  background-color: #f8fafc !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+}
+
+.managex-dashboard ::placeholder {
+  color: #94a3b8 !important;
+}
