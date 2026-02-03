@@ -3,6 +3,7 @@
 @section('inner-content')
 <div class="space-y-6 min-h-screen" style="font-family: 'Inter', sans-serif; padding: 10px;">
     
+    {{-- EN-TÊTE --}}
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6">
         <div>
             <h1 class="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter">
@@ -12,6 +13,7 @@
         </div>
     </div>
 
+    {{-- FORMULAIRE (Inchangé) --}}
     <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
         <h2 style="margin:0 0 20px 0; font-size:14px; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:#0f172a">
             Nouvelle mission
@@ -55,56 +57,131 @@
         </form>
     </div>
 
+    {{-- SUIVI DES MISSIONS --}}
     <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; overflow:hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
-        <div style="background:#f8fafc; padding:15px 25px; border-bottom:1px solid #e2e8f0; color:#64748b; font-size:10px; font-weight:900; text-transform:uppercase;">
-            Suivi des missions
+        <div style="background:#f8fafc; padding:15px 25px; border-bottom:1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color:#64748b; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:1px;">Suivi des objectifs actifs</span>
+            <span style="font-size: 8px; font-weight: 800; color: #94a3b8; background: #ffffff; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">HISTORIQUE : 5 JOURS</span>
         </div>
 
         <div class="hidden md:block">
             <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr style="background: #ffffff;">
+                        <th class="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Collaborateur & Mission</th>
+                        <th class="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Cycle de vie</th>
+                        <th class="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Statut</th>
+                    </tr>
+                </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse($tasks as $task)
-                    <tr class="hover:bg-slate-50/50 transition-colors">
+                    @php
+                        // Calcul de la couleur de la bordure gauche
+                        $borderLeftColor = '#e2e8f0'; // Gris par défaut
+                        if($task->status === 'en cours') {
+                            $borderLeftColor = $task->is_overdue ? '#ef4444' : '#2563eb'; // Rouge si retard, Bleu sinon
+                        } elseif($task->status === 'terminé') {
+                            $borderLeftColor = '#10b981'; // Vert
+                        }
+                    @endphp
+                    <tr class="hover:bg-slate-50/50 transition-colors" style="border-left: 6px solid {{ $borderLeftColor }};">
                         <td class="p-5">
-                            <div class="font-semibold text-slate-800 text-[14px]">{{ $task->title }}</div>
-                            <div class="text-[11px] text-slate-400 mt-1">{{ Str::limit($task->description, 50) }}</div>
+                            <div class="flex items-center gap-4">
+                                <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px] border border-slate-200 uppercase">
+                                    {{ substr($task->user->name, 0, 2) }}
+                                </div>
+                                <div>
+                                    <div class="font-black text-slate-900 text-[13px] uppercase tracking-tight">{{ $task->title }}</div>
+                                    <div class="text-[9px] font-black text-blue-600 uppercase tracking-tighter">Assigné à : {{ $task->user->name }}</div>
+                                </div>
+                            </div>
                         </td>
+
                         <td class="p-5 text-center">
-                            <div class="text-[10px] font-bold text-blue-600 uppercase">Pour : {{ $task->user->name }}</div>
+                            <div class="flex items-center justify-center gap-8">
+                                <div class="text-center">
+                                    <div class="text-[8px] font-black text-slate-300 uppercase mb-1">Date début</div>
+                                    <div class="text-[11px] font-bold text-slate-600">{{ $task->created_at->format('d/m/Y') }}</div>
+                                </div>
+                                <div class="text-slate-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-[8px] font-black {{ $task->is_overdue ? 'text-rose-400' : 'text-slate-300' }} uppercase mb-1">Échéance</div>
+                                    <div class="text-[11px] font-black {{ $task->is_overdue ? 'text-rose-600' : 'text-slate-800' }}">
+                                        {{ \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') }}
+                                    </div>
+                                </div>
+                            </div>
                         </td>
+
                         <td class="p-5 text-right">
-                            <div class="text-[11px] font-bold text-slate-700 mb-1">{{ \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') }}</div>
-                            <span class="px-3 py-1 border rounded-lg text-[9px] font-black {{ $task->status === 'terminé' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-slate-400 border-slate-100 bg-slate-50' }}">
-                                {{ strtoupper($task->status) }}
+                            @php
+                                $statusStyle = [
+                                    'terminé' => 'text-emerald-600 border-emerald-100 bg-emerald-50',
+                                    'échoué' => 'text-rose-600 border-rose-100 bg-rose-50',
+                                    'en cours' => 'text-blue-600 border-blue-100 bg-blue-50 animate-pulse'
+                                ];
+                                $currentStyle = $statusStyle[$task->status] ?? 'text-slate-400 border-slate-100 bg-slate-50';
+                            @endphp
+                            <span class="px-4 py-2 border rounded-xl text-[9px] font-black uppercase tracking-widest {{ $currentStyle }}">
+                                {{ $task->status }}
                             </span>
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="3" class="p-10 text-center text-slate-400 text-[11px] font-bold uppercase">Aucune mission</td></tr>
+                    <tr><td colspan="3" class="p-16 text-center text-slate-300 text-[11px] font-black uppercase tracking-[0.2em]">Aucun objectif en cours</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
+        {{-- VERSION MOBILE (avec bordure gauche) --}}
         <div class="md:hidden divide-y divide-slate-100">
             @forelse($tasks as $task)
-            <div class="p-5 space-y-3">
-                <div class="flex justify-between items-start">
-                    <div class="font-semibold text-slate-900 text-sm leading-tight">{{ $task->title }}</div>
-                    <span class="flex-shrink-0 px-2 py-1 border rounded-md text-[8px] font-black {{ $task->status === 'terminé' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-slate-400 border-slate-100 bg-slate-50' }}">
-                        {{ strtoupper($task->status) }}
+            @php
+                $borderColorMob = ($task->is_overdue && $task->status === 'en cours') ? '#ef4444' : '#2563eb';
+                if($task->status === 'terminé') $borderColorMob = '#10b981';
+            @endphp
+            <div class="p-5" style="border-left: 6px solid {{ $borderColorMob }};">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <div class="text-[12px] font-black text-slate-900 uppercase">{{ $task->title }}</div>
+                        <div class="text-[9px] font-bold text-blue-600 uppercase">Pour : {{ $task->user->name }}</div>
+                    </div>
+                    <span class="px-2 py-1 border rounded-lg text-[8px] font-black uppercase {{ $task->status === 'terminé' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-slate-400 border-slate-100 bg-slate-50' }}">
+                        {{ $task->status }}
                     </span>
                 </div>
-                <div class="text-[11px] text-slate-500 leading-relaxed">{{ $task->description }}</div>
-                <div class="flex justify-between items-center pt-2 border-t border-slate-50">
-                    <div class="text-[10px] font-bold text-slate-900">{{ $task->user->name }}</div>
-                    <div class="text-[10px] font-black text-blue-600">{{ \Carbon\Carbon::parse($task->due_date)->format('d/m/y') }}</div>
+                <div class="grid grid-cols-2 gap-2 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div>
+                        <div class="text-[8px] font-black text-slate-400 uppercase">Lancée le</div>
+                        <div class="text-[10px] font-bold text-slate-700">{{ $task->created_at->format('d/m/y') }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[8px] font-black text-slate-400 uppercase">Date butoir</div>
+                        <div class="text-[10px] font-black {{ $task->is_overdue ? 'text-rose-600' : 'text-slate-900' }}">
+                            {{ \Carbon\Carbon::parse($task->due_date)->format('d/m/y') }}
+                        </div>
+                    </div>
                 </div>
             </div>
             @empty
-            <div class="p-10 text-center text-slate-400 text-[10px] font-bold uppercase">Aucune mission</div>
+            <div class="p-10 text-center text-slate-300 text-[10px] font-black uppercase">Zéro mission</div>
             @endforelse
         </div>
     </div>
 </div>
+
+<style>
+    @keyframes pulse-soft {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    .animate-pulse {
+        animation: pulse-soft 2s infinite;
+    }
+</style>
 @endsection

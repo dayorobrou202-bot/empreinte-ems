@@ -18,6 +18,11 @@ class Task extends Model
         'status'
     ];
 
+    // TRÈS IMPORTANT : Permet de comparer les dates sans erreur
+    protected $casts = [
+        'due_date' => 'date',
+    ];
+
     public function user() {
         return $this->belongsTo(User::class);
     }

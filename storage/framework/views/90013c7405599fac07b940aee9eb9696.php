@@ -50,9 +50,9 @@
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase">Collaborateur</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Matin</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Midi</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Soir</th>
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Arrivée</th>
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Départ</th>
+                        <th class="p-5 text-[10px] font-bold text-blue-600 uppercase text-center bg-blue-50/30">Total Heures</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-right">Statut</th>
                     </tr>
                 </thead>
@@ -70,21 +70,27 @@
                                 </div>
                             </td>
                             
+                            
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                <?php echo e($row->heure_matin ?? '--:--'); ?>
+                                <?php echo e(isset($row->heure_matin) && $row->heure_matin ? \Carbon\Carbon::parse($row->heure_matin)->format('H:i') : '--:--'); ?>
 
                             </td>
+                            
+                            
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                <?php echo e($row->heure_midi ?? '--:--'); ?>
+                                <?php echo e(isset($row->heure_soir) && $row->heure_soir ? \Carbon\Carbon::parse($row->heure_soir)->format('H:i') : '--:--'); ?>
 
                             </td>
-                            <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                <?php echo e($row->heure_soir ?? '--:--'); ?>
+
+                            
+                            <td class="p-5 text-center text-[12px] font-black text-blue-700 bg-blue-50/30">
+                                <?php echo e((isset($row->total_heures) && $row->total_heures > 0) ? number_format($row->total_heures, 2) . 'h' : '--'); ?>
 
                             </td>
+
                             <td class="p-5 text-right">
-                                <span class="px-3 py-1 border rounded-lg text-[9px] font-bold <?php echo e($row->present ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50'); ?>">
-                                    <?php echo e($row->present ? 'PRÉSENT' : 'ABSENT'); ?>
+                                <span class="px-3 py-1 border rounded-lg text-[9px] font-bold <?php echo e(($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50'); ?>">
+                                    <?php echo e(($row->present ?? false) ? 'PRÉSENT' : 'ABSENT'); ?>
 
                                 </span>
                             </td>
@@ -106,23 +112,23 @@
                             </div>
                             <div class="font-semibold text-slate-800 text-sm"><?php echo e($row->user->name); ?></div>
                         </div>
-                        <span class="px-2 py-1 border rounded-md text-[8px] font-bold <?php echo e($row->present ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50'); ?>">
-                            <?php echo e($row->present ? 'PRÉSENT' : 'ABSENT'); ?>
+                        <span class="px-2 py-1 border rounded-md text-[8px] font-bold <?php echo e(($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50'); ?>">
+                            <?php echo e(($row->present ?? false) ? 'PRÉSENT' : 'ABSENT'); ?>
 
                         </span>
                     </div>
                     <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl text-center">
                         <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Matin</div>
-                            <div class="text-[11px] font-bold text-slate-700"><?php echo e($row->heure_matin ?? '--:--'); ?></div>
+                            <div class="text-[8px] text-slate-400 uppercase font-bold">Arrivée</div>
+                            <div class="text-[11px] font-bold text-slate-700"><?php echo e(isset($row->heure_matin) ? \Carbon\Carbon::parse($row->heure_matin)->format('H:i') : '--:--'); ?></div>
                         </div>
                         <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Midi</div>
-                            <div class="text-[11px] font-bold text-slate-700"><?php echo e($row->heure_midi ?? '--:--'); ?></div>
+                            <div class="text-[8px] text-slate-400 uppercase font-bold">Départ</div>
+                            <div class="text-[11px] font-bold text-slate-700"><?php echo e(isset($row->heure_soir) ? \Carbon\Carbon::parse($row->heure_soir)->format('H:i') : '--:--'); ?></div>
                         </div>
-                        <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Soir</div>
-                            <div class="text-[11px] font-bold text-slate-700"><?php echo e($row->heure_soir ?? '--:--'); ?></div>
+                        <div class="border-l border-slate-200">
+                            <div class="text-[8px] text-blue-500 uppercase font-black">Total</div>
+                            <div class="text-[11px] font-black text-blue-700"><?php echo e((isset($row->total_heures) && $row->total_heures > 0) ? number_format($row->total_heures, 1) . 'h' : '--'); ?></div>
                         </div>
                     </div>
                 </div>

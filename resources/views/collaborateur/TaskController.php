@@ -4,61 +4,94 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WeeklyScore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class TaskController extends Controller
 {
     /**
-     * Affiche la page des tâches.
-     * Admin : voit le formulaire d'ajout et TOUTES les tâches.
-     * Collab : voit uniquement ses tâches.
+     * Affiche la liste des tâches (RÉPARE L'ERREUR INDEX)
      */
     public function index()
     {
         $user = Auth::user();
+        $now = Carbon::now()->startOfDay();
 
-        // Si c'est un Admin
+        // 1. Récupération selon le rôle
         if ($user->isAdmin()) {
-            // 1. On récupère les collaborateurs pour le menu déroulant
-            $collaborators = User::where('id', '!=', $user->id)->get();
-            
-            // 2. On récupère TOUTES les tâches pour le suivi global
+            $collaborators = User::where('role_id', '!=', 1)->get();
             $tasks = Task::with('user')->latest()->get();
-
-            // 3. On renvoie vers la vue UNIQUE 'tasks.index'
-            return view('tasks.index', compact('tasks', 'collaborators'));
+        } else {
+            $collaborators = collect();
+            $tasks = Task::where('user_id', $user->id)->latest()->get();
         }
 
-        // Si c'est un Collaborateur simple
-        $tasks = Task::where('user_id', $user->id)->latest()->get();
-        
-        // On renvoie vers la même vue, mais sans la liste des collaborateurs
-        return view('tasks.index', compact('tasks'));
+        // 2. Injection de la logique de retard pour la vue
+        $tasks->each(function ($task) use ($now) {
+            $dueDate = Carbon::parse($task->due_date)->startOfDay();
+            // Une tâche est en retard si elle est 'en cours' et que la date est passée
+            $task->is_overdue = ($task->status === 'en cours' && $now->greaterThan($dueDate));
+        });
+
+        return view('tasks.index', compact('tasks', 'collaborators'));
     }
 
     /**
-     * Enregistre la mission envoyée via le formulaire général.
+     * Enregistre une mission (Admin)
      */
     public function store(Request $request)
     {
-        // 1. Validation : on vérifie que user_id est bien présent (ID choisi dans le <select>)
         $request->validate([
             'title' => 'required|string|max:255',
             'user_id' => 'required|exists:users,id', 
             'due_date' => 'required|date',
         ]);
 
-        // 2. Création de la tâche
         Task::create([
             'title' => $request->title,
             'description' => $request->description,
             'due_date' => $request->due_date,
-            'user_id' => $request->user_id, // Récupéré depuis le menu déroulant du formulaire
+            'user_id' => $request->user_id,
             'assigned_by' => Auth::id(),
             'status' => 'en cours',
         ]);
 
-        return redirect()->route('tasks.index')->with('success', 'La mission a été envoyée avec succès.');
+        return redirect()->back()->with('success', 'Mission assignée avec succès.');
+    }
+
+    /**
+     * Validation avec gestion du temps de validité
+     */
+    public function confirm(Task $task)
+    {
+        $user = Auth::user();
+        if ($user->id !== $task->user_id && !$user->isAdmin()) { abort(403); }
+
+        $now = Carbon::now()->startOfDay();
+        $dueDate = Carbon::parse($task->due_date)->startOfDay();
+
+        // Si on clique APRÈS la date : ÉCHEC
+        if ($now->greaterThan($dueDate)) {
+            $task->update(['status' => 'échoué']);
+            return redirect()->back()->with('error', 'Délai dépassé : mission marquée comme échouée (0 pts).');
+        }
+
+        // Si OK : TERMINÉ + POINTS
+        $task->update(['status' => 'terminé']);
+
+        $score = WeeklyScore::firstOrCreate([
+            'user_id' => $task->user_id,
+            'week_number' => now()->weekOfYear,
+            'year' => now()->year,
+        ]);
+
+        $score->points_tasks = min(($score->points_tasks ?? 0) + 1.5, 5.0);
+        $total = ($score->points_presence ?? 0) + ($score->points_tasks ?? 0);
+        $score->score = min($total, 10);
+        $score->save();
+
+        return redirect()->back()->with('success', 'Mission validée ! Points ajoutés au score.');
     }
 }

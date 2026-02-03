@@ -5,7 +5,7 @@
     
     @if(auth()->user()->isAdmin())
         {{-- =========================================================== --}}
-        {{-- RESTAURATION DE TON ANCIENNE PAGE HISTORIQUE (VUE ADMIN)    --}}
+        {{-- VUE ADMIN : HISTORIQUE AVEC CALCUL DES HEURES              --}}
         {{-- =========================================================== --}}
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6">
             <div>
@@ -20,7 +20,7 @@
             </a>
         </div>
 
-        {{-- TES FILTRES --}}
+        {{-- FILTRES --}}
         <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
             <form method="GET" class="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-8">
                 <div class="flex flex-col gap-2 flex-1">
@@ -44,27 +44,21 @@
             </form>
         </div>
 
-        {{-- TON ANCIEN TABLEAU COMPLET --}}
+        {{-- TABLEAU ADMIN MODIFIÉ POUR ENTRÉE/SORTIE --}}
         <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; overflow:hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                             <th class="p-5 text-[10px] font-bold text-slate-500 uppercase">Collaborateur</th>
-                            <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Matin</th>
-                            <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Midi</th>
-                            <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Soir</th>
-                            <th class="p-5 text-[10px] font-bold text-blue-600 uppercase text-center bg-blue-50/30">Total Hebdo</th>
+                            <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Arrivée</th>
+                            <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Départ</th>
+                            <th class="p-5 text-[10px] font-bold text-blue-600 uppercase text-center bg-blue-50/30">Total Jour</th>
                             <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-right">Statut</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50"> 
                         @foreach($presenceRows as $row)
-                            @php
-                                $cumulHebdo = \App\Models\Presence::where('user_id', $row->user->id)
-                                    ->whereBetween('date_pointage', [now()->startOfWeek(), now()->endOfWeek()])
-                                    ->sum('total_heures');
-                            @endphp
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="p-5 flex items-center gap-4">
                                     <div class="w-10 h-10 bg-slate-100 flex items-center justify-center text-blue-600 font-bold text-xs rounded-xl border border-slate-200">
@@ -72,10 +66,11 @@
                                     </div>
                                     <div class="text-[14px] font-semibold text-slate-800">{{ $row->user->name }}</div>
                                 </td>
-                                <td class="p-5 text-center text-[11px] font-medium text-slate-700">{{ $row->heure_matin ?? '--:--' }}</td>
-                                <td class="p-5 text-center text-[11px] font-medium text-slate-700">{{ $row->heure_midi ?? '--:--' }}</td>
-                                <td class="p-5 text-center text-[11px] font-medium text-slate-700">{{ $row->heure_soir ?? '--:--' }}</td>
-                                <td class="p-5 text-center bg-blue-50/30 font-black text-blue-700 text-[11px]">{{ number_format($cumulHebdo, 1) }}h</td>
+                                <td class="p-5 text-center text-[11px] font-medium text-slate-700">{{ $row->heure_entree ?? '--:--' }}</td>
+                                <td class="p-5 text-center text-[11px] font-medium text-slate-700">{{ $row->heure_sortie ?? '--:--' }}</td>
+                                <td class="p-5 text-center bg-blue-50/30 font-black text-blue-700 text-[11px]">
+                                    {{ $row->total_heures > 0 ? number_format($row->total_heures, 2).'h' : '--' }}
+                                </td>
                                 <td class="p-5 text-right">
                                     <span class="px-3 py-1 border rounded-lg text-[9px] font-bold {{ $row->present ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
                                         {{ $row->present ? 'PRÉSENT' : 'ABSENT' }}
@@ -90,45 +85,91 @@
 
     @else
         {{-- =========================================================== --}}
-        {{-- TA VUE POINTAGE COLLABORATEUR (BOUTONS)                     --}}
+        {{-- VUE COLLABORATEUR : SYSTÈME UNIQUE ENTRÉE/SORTIE            --}}
         {{-- =========================================================== --}}
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between border-b-4 border-slate-100 pb-4">
             <h2 class="text-slate-900 font-black text-2xl uppercase tracking-[0.3em]">Pointage — Aujourd'hui</h2>
-            <div class="text-sm text-slate-500 mt-2 md:mt-0">Heure actuelle : {{ $now->format('H:i') }}</div>
+            <div class="text-sm text-slate-500 mt-2 md:mt-0 font-bold uppercase tracking-widest">
+                {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }} | <span class="text-blue-600">{{ $now->format('H:i') }}</span>
+            </div>
         </div>
 
         @php
-    $ip_bureau = '127.0.0.1'; // On met une IP impossible
-    $user_ip = request()->ip();
-    // ON SUPPRIME LE 127.0.0.1 POUR LE TEST
-    $est_au_bureau = ($user_ip === $ip_bureau); 
-    @endphp
+            $user_ip = request()->ip();
+            $local_ips = ['172.20.10.2', '127.0.0.1', '::1', '::ffff:127.0.0.1'];
+            $est_au_bureau = in_array($user_ip, $local_ips, true);
+            // Autoriser aussi un override en DEV via .env (REQUIRE_OFFICE_WIFI=false)
+            if (env('REQUIRE_OFFICE_WIFI') === 'false' || env('REQUIRE_OFFICE_WIFI') === false) {
+                $est_au_bureau = true;
+            }
+        @endphp
 
-        <div class="mt-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                @foreach($slotData as $key => $slot)
-                    <div class="bg-white p-6 rounded-2xl text-center border border-slate-200/50 shadow-sm">
-                        <h3 class="text-sm text-slate-400 font-black uppercase mb-2 tracking-widest">{{ $slot['label'] }}</h3>
-                        @if($slot['pointed'])
-                            <div class="text-slate-900 font-black text-2xl mb-2">{{ $slot['time'] ?? '—' }}</div>
-                            <div class="text-xs text-slate-500 font-medium">Déjà pointé</div>
-                        @else
-                            <form action="{{ route('presences.store') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="slot" value="{{ $key }}">
-                                @if($slot['active'])
-                                    @if($est_au_bureau)
-                                        <button type="submit" class="w-full bg-blue-600 text-white px-6 py-3 rounded-xl font-black shadow-lg">Pointer {{ $slot['label'] }}</button>
-                                    @else
-                                        <button type="button" disabled class="w-full bg-slate-50 text-slate-300 border-2 border-dashed border-slate-200 px-6 py-3 rounded-xl font-black">Verrouillé IP</button>
-                                    @endif
-                                @else
-                                    <button type="button" disabled class="w-full bg-slate-100 text-slate-300 px-6 py-3 rounded-xl font-black opacity-60">Hors créneau</button>
-                                @endif
-                            </form>
-                        @endif
+        <div class="mt-8 max-w-2xl mx-auto">
+            <div class="bg-white p-8 rounded-[30px] text-center border border-slate-200/50 shadow-xl relative overflow-hidden">
+                {{-- Décoration de fond --}}
+                <div class="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
+                
+                <h3 class="text-xs text-slate-400 font-black uppercase mb-6 tracking-[0.2em] relative z-10">Statut de la journée</h3>
+
+                @if(!$presence || !$presence->heure_matin)
+                    {{-- ÉTAPE 1 : PAS ENCORE POINTÉ --}}
+                    <div class="py-6">
+                        <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                        </div>
+                        <p class="text-slate-500 text-sm mb-6 font-medium">Prêt à commencer votre service ?</p>
+                        
+                        <form action="{{ route('presences.store') }}" method="POST">
+                            @csrf
+                            @if($est_au_bureau)
+                                <button type="submit" class="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-[1.02] transition-transform uppercase tracking-widest">
+                                    Enregistrer mon Arrivée
+                                </button>
+                            @else
+                                <button type="button" disabled class="w-full bg-slate-50 text-slate-300 border-2 border-dashed border-slate-200 px-8 py-4 rounded-2xl font-black uppercase tracking-widest cursor-not-allowed">
+                                    <i class="fas fa-wifi mr-2"></i> Wi-Fi Bureau Requis
+                                </button>
+                            @endif
+                        </form>
                     </div>
-                @endforeach
+
+                @elseif(!$presence->heure_soir)
+                    {{-- ÉTAPE 2 : ARRIVÉE FAITE, ATTENTE SORTIE --}}
+                    <div class="py-6">
+                        <div class="text-slate-900 font-black text-4xl mb-2">{{ \Carbon\Carbon::parse($presence->heure_matin)->format('H:i') }}</div>
+                        <div class="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-8">Heure d'arrivée validée</div>
+                        
+                        <form action="{{ route('presences.store') }}" method="POST">
+                            @csrf
+                            @if($est_au_bureau)
+                                <button type="submit" class="w-full bg-rose-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-rose-700 transition-colors uppercase tracking-widest">
+                                    Pointer ma Sortie
+                                </button>
+                            @else
+                                <button type="button" disabled class="w-full bg-slate-50 text-slate-300 border-2 border-dashed border-slate-200 px-8 py-4 rounded-2xl font-black uppercase tracking-widest">
+                                    Wi-Fi Bureau Requis
+                                </button>
+                            @endif
+                        </form>
+                    </div>
+
+                @else
+                    {{-- ÉTAPE 3 : JOURNÉE FINIE --}}
+                    <div class="py-6 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div class="text-blue-600 font-black text-5xl mb-2">{{ $presence->total_heures }}h</div>
+                        <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4">Temps de travail total</div>
+                        
+                        <div class="flex justify-center gap-8 text-[11px] font-bold uppercase text-slate-600 border-t border-slate-200 pt-4 mx-6">
+                            <div>Arrivée: <span class="text-slate-900">{{ \Carbon\Carbon::parse($presence->heure_matin)->format('H:i') }}</span></div>
+                            <div>Départ: <span class="text-slate-900">{{ \Carbon\Carbon::parse($presence->heure_soir)->format('H:i') }}</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-6 text-[10px] text-emerald-500 font-black uppercase tracking-widest">
+                         ✓ Journée complétée avec succès
+                    </div>
+                @endif
             </div>
         </div>
     @endif

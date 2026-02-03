@@ -43,16 +43,16 @@
         </form>
     </div>
 
-    {{-- TABLEAU (VERSION DESKTOP) --}}
+    {{-- TABLEAU --}}
     <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; overflow:hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
         <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase">Collaborateur</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Matin</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Midi</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Soir</th>
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Arrivée</th>
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Départ</th>
+                        <th class="p-5 text-[10px] font-bold text-blue-600 uppercase text-center bg-blue-50/30">Total Heures</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-right">Statut</th>
                     </tr>
                 </thead>
@@ -68,19 +68,25 @@
                                     <div class="text-[9px] text-slate-400 font-medium uppercase">ID: {{ $row->user->id }}</div>
                                 </div>
                             </td>
-                            {{-- HEURES SANS BOUTONS --}}
+                            
+                            {{-- HEURE ARRIVÉE (SÉCURISÉE) --}}
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                {{ $row->heure_matin ?? '--:--' }}
+                                {{ isset($row->heure_matin) && $row->heure_matin ? \Carbon\Carbon::parse($row->heure_matin)->format('H:i') : '--:--' }}
                             </td>
+                            
+                            {{-- HEURE DÉPART (SÉCURISÉE) --}}
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                {{ $row->heure_midi ?? '--:--' }}
+                                {{ isset($row->heure_soir) && $row->heure_soir ? \Carbon\Carbon::parse($row->heure_soir)->format('H:i') : '--:--' }}
                             </td>
-                            <td class="p-5 text-center text-[11px] font-bold text-slate-700">
-                                {{ $row->heure_soir ?? '--:--' }}
+
+                            {{-- TOTAL CALCULÉ (SÉCURISÉ) --}}
+                            <td class="p-5 text-center text-[12px] font-black text-blue-700 bg-blue-50/30">
+                                {{ (isset($row->total_heures) && $row->total_heures > 0) ? number_format($row->total_heures, 2) . 'h' : '--' }}
                             </td>
+
                             <td class="p-5 text-right">
-                                <span class="px-3 py-1 border rounded-lg text-[9px] font-bold {{ $row->present ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
-                                    {{ $row->present ? 'PRÉSENT' : 'ABSENT' }}
+                                <span class="px-3 py-1 border rounded-lg text-[9px] font-bold {{ ($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
+                                    {{ ($row->present ?? false) ? 'PRÉSENT' : 'ABSENT' }}
                                 </span>
                             </td>
                         </tr>
@@ -100,22 +106,22 @@
                             </div>
                             <div class="font-semibold text-slate-800 text-sm">{{ $row->user->name }}</div>
                         </div>
-                        <span class="px-2 py-1 border rounded-md text-[8px] font-bold {{ $row->present ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
-                            {{ $row->present ? 'PRÉSENT' : 'ABSENT' }}
+                        <span class="px-2 py-1 border rounded-md text-[8px] font-bold {{ ($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
+                            {{ ($row->present ?? false) ? 'PRÉSENT' : 'ABSENT' }}
                         </span>
                     </div>
                     <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl text-center">
                         <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Matin</div>
-                            <div class="text-[11px] font-bold text-slate-700">{{ $row->heure_matin ?? '--:--' }}</div>
+                            <div class="text-[8px] text-slate-400 uppercase font-bold">Arrivée</div>
+                            <div class="text-[11px] font-bold text-slate-700">{{ isset($row->heure_matin) ? \Carbon\Carbon::parse($row->heure_matin)->format('H:i') : '--:--' }}</div>
                         </div>
                         <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Midi</div>
-                            <div class="text-[11px] font-bold text-slate-700">{{ $row->heure_midi ?? '--:--' }}</div>
+                            <div class="text-[8px] text-slate-400 uppercase font-bold">Départ</div>
+                            <div class="text-[11px] font-bold text-slate-700">{{ isset($row->heure_soir) ? \Carbon\Carbon::parse($row->heure_soir)->format('H:i') : '--:--' }}</div>
                         </div>
-                        <div>
-                            <div class="text-[8px] text-slate-400 uppercase font-bold">Soir</div>
-                            <div class="text-[11px] font-bold text-slate-700">{{ $row->heure_soir ?? '--:--' }}</div>
+                        <div class="border-l border-slate-200">
+                            <div class="text-[8px] text-blue-500 uppercase font-black">Total</div>
+                            <div class="text-[11px] font-black text-blue-700">{{ (isset($row->total_heures) && $row->total_heures > 0) ? number_format($row->total_heures, 1) . 'h' : '--' }}</div>
                         </div>
                     </div>
                 </div>

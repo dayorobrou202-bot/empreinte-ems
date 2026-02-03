@@ -48,7 +48,8 @@ class PaieController extends Controller
     {
         // Normalisation du montant
         $rawAmount = (string) $request->input('amount', '');
-        $normalized = trim(preg_replace('/[\s\u{00A0}]+/u', '', $rawAmount));
+        // PCRE2 n'accepte pas \u{...} — utiliser \x{00A0} pour NBSP
+        $normalized = trim(preg_replace('/[\s\x{00A0}]+/u', '', $rawAmount));
         $normalized = preg_replace('/[A-Za-z]+/u', '', $normalized);
         if (strpos($normalized, ',') !== false && strpos($normalized, '.') === false) {
             $normalized = str_replace(',', '.', $normalized);

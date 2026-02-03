@@ -7,176 +7,116 @@ use App\Models\PresenceLog;
 use App\Models\User;
 use App\Models\WeeklyScore;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class PresenceController extends Controller
 {
-    /**
-     * Vue Admin : Historique Complet
-     */
-    public function index()
-    {
-        $today = now()->toDateString();
-        $filterDate = request()->query('date', $today);
-        
-        $users = User::where('role_id', '!=', 1)->orderBy('name')->get();
-        $presences = Presence::whereDate('date_pointage', $filterDate)->get()->keyBy('user_id');
-
-        $presenceRows = collect();
-        foreach ($users as $user) {
-            $p = $presences->get($user->id);
-            $presenceRows->push((object) [
-                'user' => $user,
-                'heure_matin' => $p->heure_matin ?? null,
-                'heure_midi' => $p->heure_midi ?? null,
-                'heure_soir' => $p->heure_soir ?? null,
-                'total_heures' => $p->total_heures ?? 0,
-                'present' => $p ? (bool) $p->present : false,
-            ]);
-        }
-
-        return view('presences.admin_index', compact('users', 'today', 'filterDate', 'presenceRows'));
-    }
+    private $officeIp = '160.155.123.45'; // Ton IP de bureau
 
     /**
-     * Page de pointage (Employé)
+     * CETTE MÉTHODE MANQUAIT : Elle affiche la page de pointage
      */
     public function page()
     {
         $user = auth()->user();
-
+        
+        // Redirige l'admin vers sa vue s'il essaie d'accéder au pointage employé
         if ($user->role_id === 1) {
             return redirect()->route('admin.presences.index');
         }
 
         $now = now();
-        $today = $now->toDateString();
-        
-        $users = User::where('role_id', '!=', 1)->get();
-        $presenceRows = collect(); 
-
         $presence = Presence::where('user_id', $user->id)
-            ->whereDate('date_pointage', $today)
+            ->whereDate('date_pointage', $now->toDateString())
             ->first();
 
-        $slots = [
-            'matin' => ['start' => 6,  'end' => 12, 'label' => 'Matin'],
-            'midi'  => ['start' => 12, 'end' => 15, 'label' => 'Midi'],
-            'soir'  => ['start' => 15, 'end' => 21, 'label' => 'Soir'], 
-        ];
-
-        $slotData = [];
-        foreach ($slots as $key => $config) {
-            $field = "heure_" . $key;
-            $pointed = $presence && !empty($presence->$field);
-            $isCorrectTime = $now->hour >= $config['start'] && $now->hour < $config['end'];
-
-            $slotData[$key] = [
-                'label'   => $config['label'],
-                'pointed' => $pointed,
-                'active'  => $isCorrectTime && !$pointed,
-                'time'    => $pointed ? $presence->$field : null
-            ];
-        }
-
-        return view('presences.index', compact('presence', 'slotData', 'now', 'users', 'presenceRows'));
+        // On retourne la vue du dashboard collaborateur
+        return view('presences.index', compact('presence', 'now'));
     }
 
     /**
-     * Enregistrement du pointage (Nettoyé et Corrigé)
+     * ACTION DE POINTAGE SÉCURISÉE
      */
     public function store(Request $request)
     {
         $user = auth()->user();
-        
-        if ($user->role_id === 1) {
-            return redirect()->back()->with('error', 'L\'administrateur ne peut pas pointer.');
-        }
-
         $now = now();
         $today = $now->toDateString();
+        $userIp = $request->ip();
 
-        // 1. Sécurité IP (Wi-Fi Bureau ou Local)
-        if ($request->ip() !== '172.20.10.2' && $request->ip() !== '127.0.0.1') {
-             return redirect()->back()->with('error', 'Accès refusé : Connectez-vous au Wi-Fi du bureau.');
+        // 1. Sécurité IP
+        $type = $request->input('type', 'Bureau');
+        if ($type !== 'Télétravail' && $userIp !== $this->officeIp && !app()->isLocal()) {
+            return redirect()->back()->with('error', "IP non autorisée ($userIp).");
         }
 
-        // 2. Récupération ou création de la présence du jour
-        $presence = Presence::firstOrNew([
-            'user_id' => $user->id, 
-            'date_pointage' => $today
-        ]);
+        // 2. Récupération de la présence
+        $presence = Presence::firstOrNew(['user_id' => $user->id, 'date_pointage' => $today]);
+        if (Schema::hasColumn('presences', 'date')) { $presence->date = $today; }
 
-        $h = $now->hour;
+        $points = 0;
         $moment = '';
-        $pointsAujourdhui = 0;
 
-        // 3. Logique des créneaux et attribution des points
-        if ($h >= 6 && $h < 12) { 
-            if ($presence->heure_matin) return redirect()->back()->with('error', 'Matin déjà pointé.');
+        // 3. Logique Matin / Midi / Soir
+        if (!$presence->heure_matin) {
             $presence->heure_matin = $now->format('H:i:s');
+            $presence->type = $type;
             $presence->present = true;
-            $moment = 'matin';
-            $pointsAujourdhui = 0.25; 
+            $moment = 'Matin';
+            $points = 0.25;
+            $message = "Matin validé.";
         } 
-        elseif ($h >= 12 && $h < 15) { 
-            if ($presence->heure_midi) return redirect()->back()->with('error', 'Midi déjà pointé.');
-            $presence->heure_midi = $now->format('H:i:s');
-            $moment = 'midi';
-            $pointsAujourdhui = 0.15;
-        } 
-        elseif ($h >= 15 && $h < 21) { 
-            if ($presence->heure_soir) return redirect()->back()->with('error', 'Soir déjà pointé.');
-            $presence->heure_soir = $now->format('H:i:s');
-            $moment = 'soir';
-            $pointsAujourdhui = 0.20;
-
-            // Calcul du bonus si journée complète
-            if ($presence->heure_matin) {
-                $debut = Carbon::parse($presence->heure_matin);
-                $minutes = $debut->diffInMinutes($now);
-                if ($presence->heure_midi) { $minutes -= 60; }
-                $presence->total_heures = max(0, round($minutes / 60, 2));
-
-                if ($presence->total_heures >= 7) {
-                    $pointsAujourdhui += 0.40; // Bonus assiduité
-                }
+        elseif (!$presence->heure_midi) {
+            if (Carbon::parse($presence->heure_matin)->diffInMinutes($now) < 90) {
+                return redirect()->back()->with('error', "Attendez 1h30 entre deux pointages.");
             }
+            $presence->heure_midi = $now->format('H:i:s');
+            $moment = 'Midi';
+            $points = 0.25;
+            $message = "Midi validé.";
+        } 
+        elseif (!$presence->heure_soir) {
+            if (Carbon::parse($presence->heure_midi)->diffInMinutes($now) < 90) {
+                return redirect()->back()->with('error', "Attendez 1h30 après le midi.");
+            }
+            $presence->heure_soir = $now->format('H:i:s');
+            $moment = 'Soir';
+            
+            // Calcul total
+            $debut = Carbon::parse($presence->heure_matin);
+            $heures = $debut->diffInMinutes($now) / 60;
+            if ($heures > 5) { $heures -= 1; }
+            $presence->total_heures = round($heures, 2);
+            $points = ($heures >= 7) ? 0.75 : 0.25;
+            $message = "Soir validé ($heures h).";
         } else {
-            return redirect()->back()->with('error', 'Aucun créneau ouvert actuellement.');
-        }
-
-        // Assurer que le champ `date` (non-nullable en base) est renseigné
-        if (Schema::hasColumn('presences', 'date')) {
-            $presence->date = $today;
+            return redirect()->back()->with('error', "Journée terminée.");
         }
 
         $presence->save();
-
-        // 4. Mise à jour du Score Hebdomadaire (Moteur du classement)
-        $weeklyScore = WeeklyScore::firstOrCreate([
-            'user_id' => $user->id,
-            'week_number' => $now->weekOfYear,
-            'year' => $now->year,
-        ]);
-
-        // On ajoute les points gagnés au cumul
-        $weeklyScore->increment('points_presence', $pointsAujourdhui);
+        $this->updateScore($user->id, $points);
         
-        // Calcul du score total (max 10 points)
-        $total = $weeklyScore->points_presence + ($weeklyScore->points_tasks ?? 0) + ($weeklyScore->points_collaboration ?? 0);
-        $weeklyScore->score = min($total, 10);
-        $weeklyScore->save();
-
-        // 5. Historique (Logs)
         PresenceLog::create([
             'user_id' => $user->id, 
             'occurred_at' => $now, 
-            'slot' => $moment
+            'slot' => $moment, 
+            'ip_address' => $userIp
         ]);
 
-        return redirect()->back()->with('status', "Pointage du $moment validé (+ $pointsAujourdhui pts) !");
+        return redirect()->back()->with('status', $message);
+    }
+
+    private function updateScore($userId, $pts)
+    {
+        $now = now();
+        $score = WeeklyScore::firstOrCreate([
+            'user_id' => $userId,
+            'week_number' => $now->weekOfYear,
+            'year' => $now->year,
+        ]);
+        $score->increment('points_presence', $pts);
+        $score->score = min(($score->points_presence + ($score->points_tasks ?? 0)), 10);
+        $score->save();
     }
 }
