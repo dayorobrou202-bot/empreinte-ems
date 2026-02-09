@@ -10,7 +10,7 @@ use Carbon\Carbon;
 
 class PresenceController extends Controller
 {
-    // Ajoute bien ton IP ici
+    // Liste des IPs fixes du bureau (Wi-Fi)
     private $allowedIps = ['102.67.252.62', '160.155.123.45', '41.202.219.8'];
 
     public function page(Request $request)
@@ -19,13 +19,12 @@ class PresenceController extends Controller
         $now = now();
         $userIp = $this->getRealIp($request);
 
-        // Vérification de l'IP
-        $isAtOffice = in_array($userIp, $this->allowedIps);
+        // --- LA SÉCURITÉ ---
+        // On est autorisé si : on est sur la bonne IP OU si on est l'ADMIN
+        $isAtOffice = in_array($userIp, $this->allowedIps) || $user->role_id == 1;
 
-        // --- ASTUCE POUR TOI ---
-        // Si tu es bloqué, on envoie l'IP à la vue pour l'afficher dans un message
         if (!$isAtOffice) {
-            session()->now('warning', "IP non reconnue : $userIp. Connectez-vous au Wi-Fi du bureau.");
+            session()->now('warning', "IP non reconnue ($userIp). Veuillez utiliser le Wi-Fi du bureau.");
         }
 
         if ($user->isAdmin()) {
@@ -55,10 +54,11 @@ class PresenceController extends Controller
         $now = now();
         $userIp = $this->getRealIp($request);
         
-        $isAuthorized = in_array($userIp, $this->allowedIps);
+        // Même logique de sécurité pour l'enregistrement
+        $isAuthorized = in_array($userIp, $this->allowedIps) || $user->role_id == 1;
 
-        if (!app()->isLocal() && !$isAuthorized) {
-            return back()->with('error', "Accès refusé. IP $userIp non reconnue.");
+        if (!$isAuthorized) {
+            return back()->with('error', "Action impossible : IP $userIp non autorisée.");
         }
 
         $presence = Presence::firstOrNew([
