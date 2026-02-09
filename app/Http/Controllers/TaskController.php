@@ -7,124 +7,115 @@ use App\Models\User;
 use App\Models\WeeklyScore;
 use App\Notifications\TaskCompleted;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class TaskController extends Controller
 {
-    /**
-     * Affiche la liste des missions (Vue Admin ou Collaborateur)
-     */
     public function index()
     {
         $user = Auth::user();
         if (!$user) return redirect()->route('login');
 
         $now = Carbon::now()->startOfDay();
+        
+        // On initialise toujours pour éviter l'erreur "Variable undefined" dans la vue
+        $collaborators = User::where('role_id', '!=', 1)->orderBy('name')->get();
 
-        // --- 1. LOGIQUE ADMIN ---
-        if ($user->role_id == 1) { 
+        if ($user->role_id == 1) {
+            // Logique ADMIN
             $tasks = Task::with('user')->orderBy('created_at', 'desc')->get();
-            $collaborators = User::where('role_id', '!=', 1)->get();
-
-            $tasks->each(function($task) use ($now) {
-                $dueDate = Carbon::parse($task->due_date)->startOfDay();
-                $task->is_overdue = ($task->status === 'en cours' && $now->greaterThan($dueDate));
+            
+            $tasks->each(function($t) use ($now) {
+                $dueDate = Carbon::parse($t->due_date)->startOfDay();
+                $t->is_overdue = ($t->status === 'en cours' && $now->gt($dueDate));
             });
 
+            // VÉRIFIE BIEN QUE CE DOSSIER EXISTE SUR TON SERVEUR
             return view('admin.tasks.index', compact('tasks', 'collaborators'));
         }
 
-        // --- 2. LOGIQUE COLLABORATEUR ---
+        // Logique COLLABORATEUR
         $tasks = Task::where('user_id', $user->id)->latest()->get();
         
-        $tasks->each(function($task) use ($now) {
-            $dueDate = Carbon::parse($task->due_date)->startOfDay();
-            $task->is_overdue = ($task->status === 'en cours' && $now->greaterThan($dueDate));
+        $tasks->each(function($t) use ($now) {
+            $dueDate = Carbon::parse($t->due_date)->startOfDay();
+            $t->is_overdue = ($t->status === 'en cours' && $now->gt($dueDate));
         });
 
-        return view('tasks.index', compact('tasks'));
+        return view('tasks.index', compact('tasks', 'collaborators'));
     }
 
-    /**
-     * Enregistre une nouvelle mission (Action Admin)
-     */
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'user_id' => 'required|exists:users,id',
-            'due_date' => 'required|date',
+            'due_date' => 'required|date'
         ]);
 
-        Task::create([
-            'title'       => $request->input('title'),
-            'description' => $request->input('description'),
-            'due_date'    => $request->input('due_date'),
-            'user_id'     => $request->input('user_id'),
-            'assigned_by' => Auth::id(),
-            'status'      => 'en cours',
+        Task::create($data + [
+            'assigned_by' => Auth::id(), 
+            'status' => 'en cours'
         ]);
 
-        return redirect()->back()->with('success', 'La mission a été envoyée avec succès.');
+        return back()->with('success', 'Mission assignée avec succès.');
     }
 
-    /**
-     * Valide ou marque en échec une mission (Action Collaborateur)
-     */
-    public function confirm(Task $task)
+    public function confirm($id)
     {
+        $task = Task::findOrFail($id);
         $user = Auth::user();
-        if (!$user) abort(403);
 
-        // Vérification des droits : propriétaire de la tâche ou admin
+        // Sécurité
         if ($user->id !== $task->user_id && $user->role_id != 1) {
-            abort(403);
+            return back()->with('error', 'Action non autorisée.');
         }
 
-        $now = Carbon::now()->startOfDay();
-        $dueDate = Carbon::parse($task->due_date)->startOfDay();
-
-        // CAS A : ÉCHEC SI RETARD
-        if ($task->status === 'en cours' && $now->greaterThan($dueDate)) {
-            $task->update(['status' => 'échoué']);
-            return redirect()->back()->with('error', 'Délai dépassé ! Mission marquée comme échouée.');
-        }
-
-        // CAS B : SUCCÈS (Dans les temps)
-        $task->update(['status' => 'terminé']);
-
-        // --- MISE À JOUR DU SCORE HEBDOMADAIRE ---
-        $score = WeeklyScore::firstOrCreate([
-            'user_id'     => $task->user_id,
-            'week_number' => now()->weekOfYear,
-            'year'        => now()->year,
+        // Mise à jour de la tâche
+        $task->update([
+            'status' => 'terminé', 
+            'completed_at' => now()
         ]);
 
-        // Ajout des points (max 5 points pour la catégorie tâches)
-        $score->points_tasks = min(($score->points_tasks ?? 0) + 1.5, 5.0);
+        // Mise à jour du score hebdomadaire
+        $score = WeeklyScore::firstOrCreate([
+            'user_id' => $task->user_id,
+            'week_number' => now()->weekOfYear,
+            'year' => now()->year,
+        ]);
+
+        // Utilisation de increment pour la sécurité SQL
+        $score->increment('points_tasks', 1.5);
         
-        // Calcul du total général sur 10
-        $totalGeneral = ($score->points_presence ?? 0) + 
-                        ($score->points_tasks ?? 0) + 
-                        ($score->points_collaboration ?? 0) + 
-                        ($score->points_manual ?? 0);
-        
-        $score->score = min($totalGeneral, 10);
+        // Recalcul du score final (plafonné à 10)
+        $total = (float)($score->points_presence ?? 0) + (float)($score->points_tasks ?? 0);
+        $score->score = min($total, 10);
         $score->save();
 
-        // --- NOTIFICATION À L'ADMIN ---
-        if (!empty($task->assigned_by)) {
-            $creator = User::find($task->assigned_by);
-            if ($creator) {
-                try { 
-                    $creator->notify(new TaskCompleted($task)); 
+        // Notification
+        if ($task->assigned_by) {
+            $admin = User::find($task->assigned_by);
+            if ($admin) {
+                try {
+                    $admin->notify(new TaskCompleted($task));
                 } catch (\Exception $e) {
-                    // On ne bloque pas le processus si le serveur mail est déconnecté
+                    // On ignore si le serveur mail n'est pas prêt
                 }
             }
         }
 
-        return redirect()->back()->with('success', 'Mission validée ! Score mis à jour.');
+        return back()->with('success', 'Mission terminée et points ajoutés !');
+    }
+
+    public function destroy(Task $task)
+    {
+        if (Auth::user()->role_id != 1) {
+            return back()->with('error', 'Action réservée aux administrateurs.');
+        }
+        
+        $task->delete();
+        return back()->with('success', 'Mission supprimée.');
     }
 }

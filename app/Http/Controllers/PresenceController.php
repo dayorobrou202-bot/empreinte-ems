@@ -8,115 +8,111 @@ use App\Models\User;
 use App\Models\WeeklyScore;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Schema;
 
 class PresenceController extends Controller
 {
-    private $officeIp = '160.155.123.45'; // Ton IP de bureau
+    private $allowedIps = ['102.67.252.62', '160.155.123.45', '41.202.219.8'];
 
-    /**
-     * CETTE MÉTHODE MANQUAIT : Elle affiche la page de pointage
-     */
-    public function page()
+    // J'ai renommé en index pour correspondre aux routes standards de Laravel
+    public function index(Request $request)
     {
         $user = auth()->user();
+        if (!$user) return redirect()->route('login');
         
-        // Redirige l'admin vers sa vue s'il essaie d'accéder au pointage employé
-        if ($user->role_id === 1) {
-            return redirect()->route('admin.presences.index');
+        $now = now();
+        $userIp = $request->header('X-Forwarded-For') ?? $request->ip();
+
+        // Remplace $user->isAdmin() qui causait l'erreur 500
+        if ($user->role_id == 1) {
+            $users = User::where('role_id', '!=', 1)->orderBy('name')->get();
+            $filterUserId = $request->query('user_id');
+            $filterDate = $request->query('date', $now->toDateString());
+
+            $presenceRows = Presence::with('user')
+                ->when($filterUserId, fn ($q) => $q->where('user_id', $filterUserId))
+                ->whereDate('date', $filterDate)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return view('presences.index', compact('users', 'presenceRows', 'filterDate', 'now'));
         }
 
-        $now = now();
+        // Vue collaborateur
         $presence = Presence::where('user_id', $user->id)
-            ->whereDate('date_pointage', $now->toDateString())
+            ->whereDate('date', $now->toDateString())
             ->first();
 
-        // On retourne la vue du dashboard collaborateur
-        return view('presences.index', compact('presence', 'now'));
+        $isAtOffice = false;
+        foreach($this->allowedIps as $ip) {
+            if(str_contains($userIp, $ip)) $isAtOffice = true;
+        }
+
+        return view('presences.index', compact('presence', 'now', 'isAtOffice', 'userIp'));
     }
 
-    /**
-     * ACTION DE POINTAGE SÉCURISÉE
-     */
+    // Garde 'page' au cas où tes routes l'utilisent encore
+    public function page(Request $request) {
+        return $this->index($request);
+    }
+
     public function store(Request $request)
     {
         $user = auth()->user();
         $now = now();
-        $today = $now->toDateString();
-        $userIp = $request->ip();
-
-        // 1. Sécurité IP
-        $type = $request->input('type', 'Bureau');
-        if ($type !== 'Télétravail' && $userIp !== $this->officeIp && !app()->isLocal()) {
-            return redirect()->back()->with('error', "IP non autorisée ($userIp).");
+        $userIp = $request->header('X-Forwarded-For') ?? $request->ip();
+        
+        $isAuthorized = false;
+        foreach($this->allowedIps as $ip) {
+            if(str_contains($userIp, $ip)) $isAuthorized = true;
         }
 
-        // 2. Récupération de la présence
-        $presence = Presence::firstOrNew(['user_id' => $user->id, 'date_pointage' => $today]);
-        if (Schema::hasColumn('presences', 'date')) { $presence->date = $today; }
+        // Autorise en local OU si l'IP est reconnue
+        if (!app()->isLocal() && !$isAuthorized) {
+            return back()->with('error', "Accès refusé. IP $userIp non reconnue.");
+        }
+
+        // Utilisation de 'date' comme dans ta base de données
+        $presence = Presence::firstOrNew([
+            'user_id' => $user->id,
+            'date' => $now->toDateString()
+        ]);
 
         $points = 0;
-        $moment = '';
-
-        // 3. Logique Matin / Midi / Soir
         if (!$presence->heure_matin) {
             $presence->heure_matin = $now->format('H:i:s');
-            $presence->type = $type;
+            $presence->type = 'Bureau';
             $presence->present = true;
-            $moment = 'Matin';
-            $points = 0.25;
-            $message = "Matin validé.";
-        } 
-        elseif (!$presence->heure_midi) {
-            if (Carbon::parse($presence->heure_matin)->diffInMinutes($now) < 90) {
-                return redirect()->back()->with('error', "Attendez 1h30 entre deux pointages.");
-            }
-            $presence->heure_midi = $now->format('H:i:s');
-            $moment = 'Midi';
-            $points = 0.25;
-            $message = "Midi validé.";
-        } 
-        elseif (!$presence->heure_soir) {
-            if (Carbon::parse($presence->heure_midi)->diffInMinutes($now) < 90) {
-                return redirect()->back()->with('error', "Attendez 1h30 après le midi.");
-            }
+            $points = 0.5;
+            $msg = "Arrivée enregistrée.";
+        } elseif (!$presence->heure_soir) {
             $presence->heure_soir = $now->format('H:i:s');
-            $moment = 'Soir';
-            
-            // Calcul total
-            $debut = Carbon::parse($presence->heure_matin);
-            $heures = $debut->diffInMinutes($now) / 60;
-            if ($heures > 5) { $heures -= 1; }
+            $diff = Carbon::parse($presence->heure_matin)->diffInMinutes($now);
+            $heures = $diff / 60;
+            if ($heures > 5) $heures -= 1; 
             $presence->total_heures = round($heures, 2);
-            $points = ($heures >= 7) ? 0.75 : 0.25;
-            $message = "Soir validé ($heures h).";
+            $points = 0.5;
+            $msg = "Sortie enregistrée.";
         } else {
-            return redirect()->back()->with('error', "Journée terminée.");
+            return back()->with('error', "Déjà pointé aujourd'hui.");
         }
 
         $presence->save();
-        $this->updateScore($user->id, $points);
-        
-        PresenceLog::create([
-            'user_id' => $user->id, 
-            'occurred_at' => $now, 
-            'slot' => $moment, 
-            'ip_address' => $userIp
-        ]);
+        $this->addScore($user->id, $points);
 
-        return redirect()->back()->with('status', $message);
+        return back()->with('status', $msg);
     }
 
-    private function updateScore($userId, $pts)
-    {
-        $now = now();
+    private function addScore($userId, $pts) {
         $score = WeeklyScore::firstOrCreate([
             'user_id' => $userId,
-            'week_number' => $now->weekOfYear,
-            'year' => $now->year,
+            'week_number' => now()->weekOfYear,
+            'year' => now()->year,
         ]);
         $score->increment('points_presence', $pts);
-        $score->score = min(($score->points_presence + ($score->points_tasks ?? 0)), 10);
+        
+        // Recalcul du total avec les missions du TaskController
+        $total = ($score->points_presence ?? 0) + ($score->points_tasks ?? 0);
+        $score->score = min($total, 10);
         $score->save();
     }
 }

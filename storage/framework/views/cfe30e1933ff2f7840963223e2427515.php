@@ -30,19 +30,19 @@
         <div class="flex items-center justify-between px-2">
             <div class="flex items-center gap-3">
                 <div class="w-1.5 h-7 bg-blue-600 rounded-full"></div>
-                <h2 class="text-slate-900 font-black text-lg md:text-xl uppercase tracking-tighter">Classement Équipe</h2>
+                <h2 class="text-slate-900 font-black text-lg md:text-xl uppercase tracking-tighter">Top 5 Classement</h2>
             </div>
             <span class="bg-blue-600/10 text-blue-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100">Live</span>
         </div>
 
         <div class="space-y-4">
-            <?php $__currentLoopData = $topUsers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            
+            <?php $__currentLoopData = $topUsers->take(5); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $index => $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <?php
                     $score = round($user->avgScore ?? $user->avg_score ?? 0);
                     $isMe = auth()->id() && auth()->id() === ($user->id ?? null);
                     $userPercent = $user->avgScore ?? $user->avg_score ?? $score;
                     
-                    // Couleur de bordure dynamique pour le classement
                     $borderColor = 'border-slate-200';
                     $barColor = 'bg-blue-600';
                     if($index == 0) { $borderColor = 'border-yellow-400'; $barColor = 'bg-yellow-400'; }
@@ -51,7 +51,6 @@
                     if($isMe) { $borderColor = 'border-blue-600'; $barColor = 'bg-blue-600'; }
                 ?>
 
-                
                 <div class="group flex flex-col md:flex-row md:items-center justify-between p-4 md:p-6 bg-white shadow-lg shadow-slate-200/40 rounded-[28px] border-l-[8px] <?php echo e($borderColor); ?> border-t border-r border-b border-slate-100 transition-all <?php echo e($isMe ? 'ring-2 ring-blue-500/5' : ''); ?>">
                     
                     <div class="flex items-center gap-4 flex-1">
@@ -75,7 +74,6 @@
                                 <?php endif; ?>
                             </div>
                             
-                            
                             <div class="flex items-center gap-3">
                                 <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[200px]">
                                     <div class="h-full <?php echo e($barColor); ?> rounded-full transition-all duration-1000" style="width: <?php echo e($userPercent); ?>%"></div>
@@ -85,7 +83,6 @@
                         </div>
                     </div>
 
-                    
                     <div class="mt-4 md:mt-0 flex items-center justify-between md:justify-end border-t md:border-t-0 border-slate-50 pt-3 md:pt-0">
                         <span class="text-[9px] font-black text-slate-400 uppercase bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 tracking-[0.1em]">
                             <?php echo e($user->position ?? 'Collaborateur'); ?>
@@ -94,12 +91,22 @@
                     </div>
                 </div>
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+            
+            <?php if($topUsers->count() > 5): ?>
+                <div class="text-center py-6">
+                    <div class="inline-block px-6 py-2 bg-slate-50 rounded-full border border-slate-100">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                            Affichage limité aux 5 meilleurs sur <?php echo e($topUsers->count()); ?> collaborateurs
+                        </p>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <style>
-    /* Assure que la bordure gauche est bien arrondie même avec Tailwind */
     .border-l-\[6px\], .border-l-\[8px\] {
         border-top-left-radius: 24px !important;
         border-bottom-left-radius: 24px !important;
