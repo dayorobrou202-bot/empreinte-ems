@@ -17,18 +17,9 @@ class PresenceController extends Controller
     {
         $user = auth()->user();
         $now = now();
+        // Retirer la vérification d'IP : autoriser le pointage depuis n'importe où
         $userIp = $this->getRealIp($request);
-
-        // Flags depuis .env
-        $requireWifi = filter_var(env('REQUIRE_OFFICE_WIFI', true), FILTER_VALIDATE_BOOLEAN);
-        $allowed = $this->getAllowedIps();
-
-        // Autorisation : Admin ou IP reconnue ou désactivation via .env
-        $isAtOffice = !$requireWifi || in_array($userIp, $allowed, true) || $user->role_id == 1;
-
-        if (!$isAtOffice) {
-            session()->now('warning', "IP non reconnue ($userIp). Veuillez utiliser le Wi-Fi du bureau ou désactiver REQUIRE_OFFICE_WIFI pour tester.");
-        }
+        $isAtOffice = true;
 
         if ($user->isAdmin()) {
             $users = User::where('role_id', '!=', 1)->orderBy('name')->get();
@@ -56,14 +47,7 @@ class PresenceController extends Controller
         $user = auth()->user();
         $now = now();
         $userIp = $this->getRealIp($request);
-        
-        // Sécurité IP (Admin et Local exemptés pour tests)
-        $requireWifi = filter_var(env('REQUIRE_OFFICE_WIFI', true), FILTER_VALIDATE_BOOLEAN);
-        $allowed = $this->getAllowedIps();
-        $isAuthorized = app()->isLocal() || !$requireWifi || in_array($userIp, $allowed, true) || $user->role_id == 1;
-        if (!$isAuthorized) {
-            return back()->with('error', "Accès refusé. IP $userIp non reconnue.");
-        }
+        // Retirer la vérification d'IP : pointage autorisé depuis n'importe où
 
         $presence = Presence::firstOrNew([
             'user_id' => $user->id,
