@@ -8,6 +8,7 @@ use App\Models\Presence;
 use App\Models\WeeklyScore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -16,18 +17,20 @@ class DashboardController extends Controller
         $now = now();
         $today = $now->toDateString();
 
-        // 1. Statistiques
+        // 1. Statistiques des collaborateurs et tâches
         $collaborateursCount = User::where('role_id', '!=', 1)->count();
         $totalTasks = Task::count();
         $pendingTasks = Task::where('status', 'en cours')->count();
 
-        // 2. Présences
-        $presenceCount = Presence::whereDate('date_pointage', $today)->count();
+        // 2. COMPTAGE DES PRÉSENCES (On utilise la colonne 'date')
+        $presenceCount = Presence::whereDate('date', $today)->count();
+        
+        // Pour les boutons de pointage de l'utilisateur connecté
         $todayPresence = Presence::where('user_id', auth()->id())
-            ->whereDate('date_pointage', $today)
+            ->whereDate('date', $today)
             ->first();
 
-        // 3. CLASSEMENT COMPLET (Sans limite et sans erreur de colonne)
+        // 3. CLASSEMENT DES PERFORMANCES (Correction : points_presence au lieu de score)
         $topUsers = User::where('role_id', '!=', 1)
             ->leftJoin('weekly_scores', function($join) use ($now) {
                 $join->on('users.id', '=', 'weekly_scores.user_id')
@@ -37,20 +40,20 @@ class DashboardController extends Controller
             ->select([
                 'users.id',
                 'users.name',
-                // 'users.position', // RETIRÉ : Cause de l'erreur SQL
-                DB::raw('COALESCE(weekly_scores.score, 0) as current_score')
+                // On utilise COALESCE pour afficher 0 si aucun point n'est encore enregistré
+                DB::raw('COALESCE(weekly_scores.points_presence, 0) as current_score')
             ])
             ->orderByDesc('current_score') 
             ->orderBy('users.name')
-            // ->limit(5) // RETIRÉ : Pour afficher toute l'équipe
             ->get();
 
-        // Transformer le score en pourcentage
+        // Conversion du score pour la vue (ex: 1 point par jour -> 10% par jour)
         $topUsers->transform(function ($u) {
             $u->avgScore = (int) ($u->current_score * 10); 
             return $u;
         });
 
+        // Moyenne générale de performance de l'équipe
         $avgScore = $topUsers->count() > 0 ? (int) $topUsers->avg('avgScore') : 0;
 
         return view('dashboard', compact(
