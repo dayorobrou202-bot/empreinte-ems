@@ -10,8 +10,8 @@ use Carbon\Carbon;
 
 class PresenceController extends Controller
 {
-    // IPs autorisées du bureau
-    private $allowedIps = ['102.67.252.62', '160.155.123.45', '41.202.219.8'];
+    // IPs autorisées du bureau (peuvent venir de .env via OFFICE_IPS)
+    private $allowedIps = null;
 
     public function page(Request $request)
     {
@@ -19,11 +19,15 @@ class PresenceController extends Controller
         $now = now();
         $userIp = $this->getRealIp($request);
 
-        // Autorisation : Admin ou IP reconnue
-        $isAtOffice = in_array($userIp, $this->allowedIps) || $user->role_id == 1;
+        // Flags depuis .env
+        $requireWifi = filter_var(env('REQUIRE_OFFICE_WIFI', true), FILTER_VALIDATE_BOOLEAN);
+        $allowed = $this->getAllowedIps();
+
+        // Autorisation : Admin ou IP reconnue ou désactivation via .env
+        $isAtOffice = !$requireWifi || in_array($userIp, $allowed, true) || $user->role_id == 1;
 
         if (!$isAtOffice) {
-            session()->now('warning', "IP non reconnue ($userIp). Veuillez utiliser le Wi-Fi du bureau.");
+            session()->now('warning', "IP non reconnue ($userIp). Veuillez utiliser le Wi-Fi du bureau ou désactiver REQUIRE_OFFICE_WIFI pour tester.");
         }
 
         if ($user->isAdmin()) {
@@ -54,7 +58,9 @@ class PresenceController extends Controller
         $userIp = $this->getRealIp($request);
         
         // Sécurité IP (Admin et Local exemptés pour tests)
-        $isAuthorized = app()->isLocal() || in_array($userIp, $this->allowedIps) || $user->role_id == 1;
+        $requireWifi = filter_var(env('REQUIRE_OFFICE_WIFI', true), FILTER_VALIDATE_BOOLEAN);
+        $allowed = $this->getAllowedIps();
+        $isAuthorized = app()->isLocal() || !$requireWifi || in_array($userIp, $allowed, true) || $user->role_id == 1;
         if (!$isAuthorized) {
             return back()->with('error', "Accès refusé. IP $userIp non reconnue.");
         }
@@ -115,6 +121,23 @@ class PresenceController extends Controller
     private function getRealIp(Request $request) {
         $ip = $request->header('X-Forwarded-For');
         return $ip ? trim(explode(',', $ip)[0]) : $request->ip();
+    }
+
+    private function getAllowedIps(): array
+    {
+        if ($this->allowedIps !== null) {
+            return $this->allowedIps;
+        }
+
+        $env = env('OFFICE_IPS');
+        if ($env) {
+            $this->allowedIps = array_map('trim', explode(',', $env));
+            return $this->allowedIps;
+        }
+
+        // Valeurs par défaut si non configurées
+        $this->allowedIps = ['102.67.252.62', '160.155.123.45', '41.202.219.8'];
+        return $this->allowedIps;
     }
 
     private function addScore($userId, $pts) {
