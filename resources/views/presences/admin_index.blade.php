@@ -53,6 +53,8 @@
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Arrivée</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Départ</th>
                         <th class="p-5 text-[10px] font-bold text-blue-600 uppercase text-center bg-blue-50/30">Total Heures</th>
+                        {{-- NOUVELLE COLONNE POSITION --}}
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-center">Localisation</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase text-right">Statut</th>
                     </tr>
                 </thead>
@@ -69,19 +71,32 @@
                                 </div>
                             </td>
                             
-                            {{-- HEURE ARRIVÉE (SÉCURISÉE) --}}
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
                                 {{ isset($row->heure_matin) && $row->heure_matin ? \Carbon\Carbon::parse($row->heure_matin)->format('H:i') : '--:--' }}
                             </td>
                             
-                            {{-- HEURE DÉPART (SÉCURISÉE) --}}
                             <td class="p-5 text-center text-[11px] font-bold text-slate-700">
                                 {{ isset($row->heure_soir) && $row->heure_soir ? \Carbon\Carbon::parse($row->heure_soir)->format('H:i') : '--:--' }}
                             </td>
 
-                            {{-- TOTAL CALCULÉ (SÉCURISÉ) --}}
                             <td class="p-5 text-center text-[12px] font-black text-blue-700 bg-blue-50/30">
                                 {{ (isset($row->total_heures) && $row->total_heures > 0) ? number_format($row->total_heures, 2) . 'h' : '--' }}
+                            </td>
+
+                            {{-- CELLULE POSITION GPS --}}
+                            <td class="p-5 text-center">
+                                @if($row->latitude_entree && $row->longitude_entree)
+                                    <a href="https://www.google.com/maps?q={{ $row->latitude_entree }},{{ $row->longitude_entree }}" 
+                                       target="_blank" 
+                                       class="inline-flex items-center gap-1 bg-slate-900 text-white px-2 py-1 rounded-md text-[9px] font-bold hover:bg-blue-600 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        </svg>
+                                        MAP
+                                    </a>
+                                @else
+                                    <span class="text-[8px] text-slate-300 italic">No GPS</span>
+                                @endif
                             </td>
 
                             <td class="p-5 text-right">
@@ -106,9 +121,15 @@
                             </div>
                             <div class="font-semibold text-slate-800 text-sm">{{ $row->user->name }}</div>
                         </div>
-                        <span class="px-2 py-1 border rounded-md text-[8px] font-bold {{ ($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
-                            {{ ($row->present ?? false) ? 'PRÉSENT' : 'ABSENT' }}
-                        </span>
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="px-2 py-1 border rounded-md text-[8px] font-bold {{ ($row->present ?? false) ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : 'text-rose-600 border-rose-100 bg-rose-50' }}">
+                                {{ ($row->present ?? false) ? 'PRÉSENT' : 'ABSENT' }}
+                            </span>
+                            {{-- BOUTON MAP MOBILE --}}
+                            @if($row->latitude_entree)
+                                <a href="https://www.google.com/maps?q={{ $row->latitude_entree }},{{ $row->longitude_entree }}" target="_blank" class="text-[8px] font-black text-blue-600 underline">VOIR GPS</a>
+                            @endif
+                        </div>
                     </div>
                     <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl text-center">
                         <div>
@@ -130,4 +151,3 @@
     </div>
 </div>
 @endsection
-
