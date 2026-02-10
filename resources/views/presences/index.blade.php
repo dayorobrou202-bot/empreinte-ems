@@ -4,9 +4,7 @@
 <div class="space-y-6 min-h-screen" style="font-family: 'Inter', sans-serif; padding: 10px;">
     
     @if(auth()->user()->isAdmin())
-        {{-- =========================================================== --}}
-        {{-- VUE ADMIN : HISTORIQUE AVEC CALCUL DES HEURES              --}}
-        {{-- =========================================================== --}}
+        {{-- VUE ADMIN : HISTORIQUE --}}
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6">
             <div>
                 <h1 class="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter">
@@ -44,7 +42,7 @@
             </form>
         </div>
 
-        {{-- TABLEAU ADMIN MODIFIÉ POUR ENTRÉE/SORTIE --}}
+        {{-- TABLEAU ADMIN --}}
         <div style="background:#ffffff; border: 1px solid #e2e8f0; border-radius: 20px; overflow:hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05)">
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -84,9 +82,7 @@
         </div>
 
     @else
-        {{-- =========================================================== --}}
-        {{-- VUE COLLABORATEUR : SYSTÈME UNIQUE ENTRÉE/SORTIE            --}}
-        {{-- =========================================================== --}}
+        {{-- VUE COLLABORATEUR --}}
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between border-b-4 border-slate-100 pb-4">
             <h2 class="text-slate-900 font-black text-2xl uppercase tracking-[0.3em]">Pointage — Aujourd'hui</h2>
             <div class="text-sm text-slate-500 mt-2 md:mt-0 font-bold uppercase tracking-widest">
@@ -98,7 +94,6 @@
             $user_ip = request()->ip();
             $local_ips = ['172.20.10.2', '127.0.0.1', '::1', '::ffff:127.0.0.1'];
             $est_au_bureau = in_array($user_ip, $local_ips, true);
-            // Autoriser aussi un override en DEV via .env (REQUIRE_OFFICE_WIFI=false)
             if (env('REQUIRE_OFFICE_WIFI') === 'false' || env('REQUIRE_OFFICE_WIFI') === false) {
                 $est_au_bureau = true;
             }
@@ -106,13 +101,11 @@
 
         <div class="mt-8 max-w-2xl mx-auto">
             <div class="bg-white p-8 rounded-[30px] text-center border border-slate-200/50 shadow-xl relative overflow-hidden">
-                {{-- Décoration de fond --}}
                 <div class="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
                 
                 <h3 class="text-xs text-slate-400 font-black uppercase mb-6 tracking-[0.2em] relative z-10">Statut de la journée</h3>
 
                 @if(!$presence || !$presence->heure_matin)
-                    {{-- ÉTAPE 1 : PAS ENCORE POINTÉ --}}
                     <div class="py-6">
                         <div class="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -121,10 +114,14 @@
                         </div>
                         <p class="text-slate-500 text-sm mb-6 font-medium">Prêt à commencer votre service ?</p>
                         
-                        <form action="{{ route('presences.store') }}" method="POST">
+                        {{-- FORMULAIRE ARRIVÉE AVEC GPS --}}
+                        <form action="{{ route('presences.store') }}" method="POST" id="form-presence">
                             @csrf
+                            <input type="hidden" name="latitude" id="lat">
+                            <input type="hidden" name="longitude" id="long">
+                            
                             @if($est_au_bureau)
-                                <button type="submit" class="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-[1.02] transition-transform uppercase tracking-widest">
+                                <button type="button" onclick="recordLocation(this)" class="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-[1.02] transition-transform uppercase tracking-widest">
                                     Enregistrer mon Arrivée
                                 </button>
                             @else
@@ -136,15 +133,18 @@
                     </div>
 
                 @elseif(!$presence->heure_soir)
-                    {{-- ÉTAPE 2 : ARRIVÉE FAITE, ATTENTE SORTIE --}}
                     <div class="py-6">
                         <div class="text-slate-900 font-black text-4xl mb-2">{{ \Carbon\Carbon::parse($presence->heure_matin)->format('H:i') }}</div>
                         <div class="text-[10px] text-emerald-500 font-black uppercase tracking-widest mb-8">Heure d'arrivée validée</div>
                         
-                        <form action="{{ route('presences.store') }}" method="POST">
+                        {{-- FORMULAIRE SORTIE AVEC GPS --}}
+                        <form action="{{ route('presences.store') }}" method="POST" id="form-presence">
                             @csrf
+                            <input type="hidden" name="latitude" id="lat">
+                            <input type="hidden" name="longitude" id="long">
+
                             @if($est_au_bureau)
-                                <button type="submit" class="w-full bg-rose-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-rose-700 transition-colors uppercase tracking-widest">
+                                <button type="button" onclick="recordLocation(this)" class="w-full bg-rose-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-rose-700 transition-colors uppercase tracking-widest">
                                     Pointer ma Sortie
                                 </button>
                             @else
@@ -156,7 +156,6 @@
                     </div>
 
                 @else
-                    {{-- ÉTAPE 3 : JOURNÉE FINIE --}}
                     <div class="py-6 bg-slate-50 rounded-2xl border border-slate-100">
                         <div class="text-blue-600 font-black text-5xl mb-2">{{ $presence->total_heures }}h</div>
                         <div class="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4">Temps de travail total</div>
@@ -174,4 +173,35 @@
         </div>
     @endif
 </div>
+
+{{-- SCRIPT DE GÉOLOCALISATION --}}
+<script>
+function recordLocation(button) {
+    const form = button.closest('form');
+    // On change le style du bouton pour montrer qu'on travaille
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Localisation...';
+    button.disabled = true;
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                document.getElementById('lat').value = position.coords.latitude;
+                document.getElementById('long').value = position.coords.longitude;
+                form.submit();
+            },
+            function(error) {
+                // Si l'utilisateur refuse ou erreur, on prévient mais on peut laisser pointer (optionnel)
+                console.error("Erreur GPS:", error.message);
+                alert("La localisation est requise pour valider le pointage. Veuillez l'activer.");
+                button.innerHTML = 'Réessayer le pointage';
+                button.disabled = false;
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+        );
+    } else {
+        alert("La géolocalisation n'est pas supportée par votre navigateur.");
+        form.submit();
+    }
+}
+</script>
 @endsection

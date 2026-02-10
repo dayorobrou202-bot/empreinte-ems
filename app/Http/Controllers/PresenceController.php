@@ -10,16 +10,14 @@ use Carbon\Carbon;
 
 class PresenceController extends Controller
 {
-    // IPs autorisées du bureau (peuvent venir de .env via OFFICE_IPS)
-    private $allowedIps = null;
-
     public function page(Request $request)
     {
         $user = auth()->user();
         $now = now();
-        // Retirer la vérification d'IP : autoriser le pointage depuis n'importe où
-        $userIp = $this->getRealIp($request);
-        $isAtOffice = true;
+        
+        // On force l'accès pour tout le monde sans vérifier l'IP
+        $isAtOffice = true; 
+        $userIp = $request->ip();
 
         if ($user->isAdmin()) {
             $users = User::where('role_id', '!=', 1)->orderBy('name')->get();
@@ -46,8 +44,6 @@ class PresenceController extends Controller
     {
         $user = auth()->user();
         $now = now();
-        $userIp = $this->getRealIp($request);
-        // Retirer la vérification d'IP : pointage autorisé depuis n'importe où
 
         $presence = Presence::firstOrNew([
             'user_id' => $user->id,
@@ -56,72 +52,42 @@ class PresenceController extends Controller
 
         // 1. POINTAGE DU MATIN
         if (!$presence->heure_matin) {
-            // Règle : Pas de pointage avant 08:30
-            if ($now->format('H:i') < '08:30') {
-                return back()->with('error', "Le pointage ne commence qu'à 08:30.");
-            }
-
-            // Calcul du retard éventuel après 08:30
-            $heureLimite = Carbon::parse($now->toDateString() . ' 08:30:00');
-            $retardMinutes = 0;
-            if ($now->gt($heureLimite)) {
-                $retardMinutes = $heureLimite->diffInMinutes($now);
-            }
-
+            // On enregistre l'heure et le GPS sans poser de questions
             $presence->heure_matin = $now->format('H:i:s');
-            $presence->type = $request->type ?? 'Bureau';
+            $presence->type = 'Pointage';
             $presence->present = true;
+            
+            // On récupère le GPS s'il est là, sinon ça reste vide (pas de blocage)
+            $presence->latitude_entree = $request->latitude;
+            $presence->longitude_entree = $request->longitude;
+            
             $presence->save();
-
             $this->addScore($user->id, 0.5);
-
-            if ($retardMinutes > 0) {
-                return back()->with('warning_retard', "Pointage réussi, mais vous avez $retardMinutes minutes de retard !");
-            }
 
             return back()->with('status', "Arrivée enregistrée à " . $now->format('H:i'));
         } 
         
-        // 2. POINTAGE DU SOIR (SORTIE)
+        // 2. POINTAGE DU SOIR
         elseif (!$presence->heure_soir) {
             $presence->heure_soir = $now->format('H:i:s');
             
-            // Calcul total d'heures et déduction automatique de 1h (60 min)
+            // Calcul simple
             $heureArrivee = Carbon::parse($presence->heure_matin);
             $minutesTotales = $heureArrivee->diffInMinutes($now);
-            $minutesTravaillees = max(0, $minutesTotales - 60);
+            $minutesTravaillees = max(0, $minutesTotales - 60); // On déduit 1h de pause
             
             $presence->total_heures = round($minutesTravaillees / 60, 2);
-            $presence->save();
 
+            $presence->latitude_sortie = $request->latitude;
+            $presence->longitude_sortie = $request->longitude;
+
+            $presence->save();
             $this->addScore($user->id, 0.5);
 
-            return back()->with('status', "Sortie enregistrée. 1h de pause déduite. Total : " . $presence->total_heures . "h");
+            return back()->with('status', "Sortie enregistrée. Total : " . $presence->total_heures . "h");
         } 
 
-        return back()->with('error', "Vous avez déjà terminé votre journée.");
-    }
-
-    private function getRealIp(Request $request) {
-        $ip = $request->header('X-Forwarded-For');
-        return $ip ? trim(explode(',', $ip)[0]) : $request->ip();
-    }
-
-    private function getAllowedIps(): array
-    {
-        if ($this->allowedIps !== null) {
-            return $this->allowedIps;
-        }
-
-        $env = env('OFFICE_IPS');
-        if ($env) {
-            $this->allowedIps = array_map('trim', explode(',', $env));
-            return $this->allowedIps;
-        }
-
-        // Valeurs par défaut si non configurées
-        $this->allowedIps = ['102.67.252.62', '160.155.123.45', '41.202.219.8'];
-        return $this->allowedIps;
+        return back()->with('error', "Journée déjà terminée.");
     }
 
     private function addScore($userId, $pts) {
@@ -130,7 +96,6 @@ class PresenceController extends Controller
             'week_number' => now()->weekOfYear,
             'year' => now()->year,
         ]);
-        // On incrémente le score (colonne points_presence)
         $score->increment('points_presence', $pts);
     }
 }

@@ -129,7 +129,7 @@
                 </div>
             </div>
 
-            {{-- HISTORIQUE DES ÉVALUATIONS (Correction sortByDesc sur null) --}}
+            {{-- HISTORIQUE DES ÉVALUATIONS --}}
             <div class="bg-white shadow-sm border border-slate-200 rounded-[20px] overflow-hidden">
                 <div class="bg-slate-50 px-6 md:px-8 py-6 border-b border-slate-100">
                     <h3 class="text-[10px] md:text-sm font-black text-slate-900 uppercase tracking-[0.3em]">Historique des évaluations</h3>
